@@ -1,0 +1,202 @@
+---
+title: "Marvel Comic Presentation Reduced"
+author: "Eric Hogue"
+date: "8/10/2021"
+output:
+  ioslides_presentation:
+    smaller: yes
+    widescreen: yes
+  slidy_presentation: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+
+
+## Marvel's Next Breakthrough Characters
+
+<div style="float: left; width: 50%;">
+
+
+Building on over 80 years of success, Marvel is looking to introduce 2 new characters to captivate a new generation of audiences. 
+
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="100%"}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Marvel_universe.png")
+```
+
+</div>
+
+
+## Marvel's Most Succesful Characters
+
+<div style="float: left; width: 50%;">
+
+Number of Appearances
+
+ - Issues with characters that were introduced earlier in time. 
+
+Appearances over Time 
+
+ - Measuring using first appearnace 
+
+</div>
+<div style="float: right; width: 50%;">
+
+
+```{r, echo=FALSE, out.width="50%",fig.align = 'center'}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Norman_Osborn.png")
+```
+</div>
+
+## Marvel's Top 10 Characters by Total Appearance {.smaller}
+
+```{r, echo=FALSE, out.width="18%"}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Web_of_Spider-Man_Vol_1_129-1.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Captian_america.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Wolverine.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/iron_man.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Thor.png")
+
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Thing_benjamin.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/mr_thing_reed.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Hulk.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/scott_summers.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/jonathorn_storm.png")
+
+```
+
+## Marvel's Top 10 Characters by Total Appearance {.smaller}
+
+```{r pull top 10 Marvel Characters,echo=FALSE,message=FALSE,warning=FALSE}
+
+library(DBI)
+library(RSQLite)
+library(tidyr)
+library(tidyverse)
+library(dbplyr)
+library(ggplot2)
+library(formatR)
+library(corrplot)
+library(rstanarm)
+library(lme4)
+library(GLMMadaptive)
+library(xgboost)
+library(vtreat)
+library(magrittr)
+library(stringr)
+library(glmnet)
+library(dbplyr)
+
+
+sqlite <- dbDriver("SQLite")
+con <- dbConnect(sqlite, "~/Data_Science_Projects/R/CaseStudy/CaseStudy.db")
+
+sql_marvel_top10 <-  "SELECT name, CAST(APPEARANCES as int) as 'Total Appearances', FIRST_APPEARANCE, year_first_appear FROM Marvel_Character ORDER BY 2 DESC LIMIT 10 "
+res <- dbSendQuery(con, sql_marvel_top10)
+df_mc_top10 <- dbFetch(res)
+
+knitr::kable(
+  df_mc_top10, 
+ # caption = "Top 10 Marvel Characters by Appearance",
+  col.names = c('Name','Total Appearances','Date of 1st Appearance','Year of 1st Appearance'),
+  align = 'l',
+  latex_options= c("stripped,scale_down","condensed")
+)
+```
+
+## Marvel's Top 10 Character Appearance per Year {.smaller}
+
+```{r pull top 10 Marvel Characters by appearance time, echo=FALSE, warning= FALSE}
+sql_marvel_top10_year <-  "SELECT name, cast(APPEARANCES as int) as 'Total Appearances', round(cast(APPEARANCES as real)/(2021 - cast(year_first_appear as real)),2) as 'Total Appearances per year', FIRST_APPEARANCE, year_first_appear FROM Marvel_Character WHERE CAST(year_first_appear as int) > 0 GROUP BY name ORDER BY 3 DESC LIMIT 10 "
+res <- dbSendQuery(con, sql_marvel_top10_year)
+df_mc_top10_year <- dbFetch(res)
+
+knitr::kable(
+  df_mc_top10_year, 
+#  caption = "Top 10 Marvel Characters by Appearance over Time",
+  col.names = c('Name','Total Appearances','Average Appearance Per Year','Date of 1st Appearance','Year of 1st Appearance'),
+  align = 'l',
+  latex_options= c("stripped,scale_down","condensed")
+)
+
+```
+
+## What Factors Make a Great Character? | Are there certain factors that influence appreances? 
+<div style="float: left; width: 50%;">
+
+
+The dataset offers information on various characteristics:
+
+-Sex
+
+-Gender/Sexuality
+
+-Eyes
+
+-Hair
+
+-Good/Evil/Neutral Alignment
+
+-Life Status 
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="50%",fig.align = 'center'}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/black_panther.png")
+```
+
+</div>
+
+## Summary of Individual Factors
+
+<div style="float: left; width: 50%;">
+
+```{r factor summary, echo=FALSE,message=FALSE,warning=FALSE}
+
+sql_marvel <- "SELECT  name , CAST(APPEARANCES as int) as 'Total_Appearances', CAST(Year as int)/10*10 as 'Decade_1st_Appearance',round(cast(APPEARANCES as real)/(2021 - cast(year as real)),2) as 'Total_Appearances_per_year',ALIGN,EYE,HAIR,SEX,GSM,ALIVE,FIRST_APPEARANCE,Year, (2021 - cast(year as real)) as 'Age' FROM Marvel 
+WHERE CAST(APPEARANCES as int) > 0 and Year > 0 and LENGTH(ALIGN)>0 and LENGTH(SEX)>0 ORDER BY 1"
+res <- dbSendQuery(con, sql_marvel)
+df_marvel <- dbFetch(res)
+
+df_marvel$EYE <- gsub(x = df_marvel$EYE, pattern = "Eyeballs", replacement = "Eyes")
+df_marvel$GSM <- ifelse(df_marvel$GSM == "", "Unclassified", df_marvel$GSM)
+df_marvel$EYE <- ifelse(df_marvel$EYE == "", "Unclassified", df_marvel$EYE)
+df_marvel$HAIR <- ifelse(df_marvel$HAIR == "", "Unclassified", df_marvel$HAIR)
+
+SEX_distinct <- n_distinct(df_marvel$SEX)
+#paste("Number of Factors within Sex Variable: ",SEX_distinct)
+ALIGN_distinct <- n_distinct(df_marvel$ALIGN)
+#paste("Number of Factors within Alignment Variable: ",ALIGN_distinct)
+GSM_distinct <- n_distinct(df_marvel$GSM)
+#paste("Number of Factors within Gender/SEX Variable: ",GSM_distinct)
+ALIVE_distinct <- n_distinct(df_marvel$ALIVE)
+#paste("Number of Factors within Alive Variable: ",ALIVE_distinct)
+HAIR_distinct <- n_distinct(df_marvel$HAIR)
+#paste("Number of Factors within Hair Variable: ",HAIR_distinct)
+EYE_distinct <- n_distinct(df_marvel$EYE)
+#paste("Number of Factors within Eyes Variable: ",EYE_distinct)
+
+tab <- matrix(c(SEX_distinct, ALIGN_distinct, GSM_distinct, ALIVE_distinct, HAIR_distinct, EYE_distinct), ncol=1, byrow=TRUE)
+colnames(tab) <- c('Number of Distinct Characteristics')
+rownames(tab) <- c('Sex','Alignment','Gender/Sexuality','Alive/Deceased','Hair Color','Eye Color')
+distinctfactortable <- as.table(tab)
+knitr::kable(distinctfactortable)
+```
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="50%",fig.align = 'center'}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/magneto.png")
+```
+
+</div>
