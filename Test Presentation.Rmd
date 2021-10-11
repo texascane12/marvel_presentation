@@ -1,0 +1,899 @@
+---
+title: "Marvel Comic Presentation"
+author: "Eric Hogue"
+date: "8/10/2021"
+output:
+  ioslides_presentation:
+    smaller: yes
+    widescreen: yes
+  slidy_presentation: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+
+
+## Marvel's Next Breakthrough Characters
+
+<div style="float: left; width: 50%;">
+
+
+Building on over 80 years of success, Marvel is looking to introduce 2 new characters to captivate a new generation of audiences. 
+
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="100%"}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Marvel_universe.png")
+```
+
+</div>
+
+
+## Marvel's Most Succesful Characters
+
+<div style="float: left; width: 50%;">
+
+Number of Appearances
+
+ - Issues with characters that were introduced earlier in time. 
+
+Appearances over Time 
+
+ - Measuring using first appearnace 
+
+</div>
+<div style="float: right; width: 50%;">
+
+
+```{r, echo=FALSE, out.width="50%",fig.align = 'center'}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Norman_Osborn.png")
+```
+</div>
+
+## Marvel's Top 10 Characters by Total Appearance {.smaller}
+
+```{r, echo=FALSE, out.width="18%"}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Web_of_Spider-Man_Vol_1_129-1.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Captian_america.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Wolverine.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/iron_man.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Thor.png")
+
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Thing_benjamin.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/mr_thing_reed.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/Hulk.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/scott_summers.png")
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/jonathorn_storm.png")
+
+```
+
+## Marvel's Top 10 Characters by Total Appearance {.smaller}
+
+```{r pull top 10 Marvel Characters,echo=FALSE,message=FALSE,warning=FALSE}
+
+library(DBI)
+library(RSQLite)
+library(tidyr)
+library(tidyverse)
+library(dbplyr)
+library(ggplot2)
+library(formatR)
+library(corrplot)
+library(rstanarm)
+library(lme4)
+library(GLMMadaptive)
+library(xgboost)
+library(vtreat)
+library(magrittr)
+library(stringr)
+library(glmnet)
+library(dbplyr)
+
+
+sqlite <- dbDriver("SQLite")
+con <- dbConnect(sqlite, "~/Data_Science_Projects/R/CaseStudy/CaseStudy.db")
+
+sql_marvel_top10 <-  "SELECT name, CAST(APPEARANCES as int) as 'Total Appearances', FIRST_APPEARANCE, year_first_appear FROM Marvel_Character ORDER BY 2 DESC LIMIT 10 "
+res <- dbSendQuery(con, sql_marvel_top10)
+df_mc_top10 <- dbFetch(res)
+
+knitr::kable(
+  df_mc_top10, 
+ # caption = "Top 10 Marvel Characters by Appearance",
+  col.names = c('Name','Total Appearances','Date of 1st Appearance','Year of 1st Appearance'),
+  align = 'l',
+  latex_options= c("stripped,scale_down","condensed")
+)
+```
+
+## Marvel's Top 10 Character Appearance per Year {.smaller}
+
+```{r pull top 10 Marvel Characters by appearance time, echo=FALSE, warning= FALSE}
+sql_marvel_top10_year <-  "SELECT name, cast(APPEARANCES as int) as 'Total Appearances', round(cast(APPEARANCES as real)/(2021 - cast(year_first_appear as real)),2) as 'Total Appearances per year', FIRST_APPEARANCE, year_first_appear FROM Marvel_Character WHERE CAST(year_first_appear as int) > 0 GROUP BY name ORDER BY 3 DESC LIMIT 10 "
+res <- dbSendQuery(con, sql_marvel_top10_year)
+df_mc_top10_year <- dbFetch(res)
+
+knitr::kable(
+  df_mc_top10_year, 
+#  caption = "Top 10 Marvel Characters by Appearance over Time",
+  col.names = c('Name','Total Appearances','Average Appearance Per Year','Date of 1st Appearance','Year of 1st Appearance'),
+  align = 'l',
+  latex_options= c("stripped,scale_down","condensed")
+)
+
+```
+
+## What Factors Make a Great Character? | Are there certain factors that influence appreances? 
+<div style="float: left; width: 50%;">
+
+
+The dataset offers information on various characteristics:
+
+-Sex
+
+-Gender/Sexuality
+
+-Eyes
+
+-Hair
+
+-Good/Evil/Neutral Alignment
+
+-Life Status 
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="50%",fig.align = 'center'}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/black_panther.png")
+```
+
+</div>
+
+## Summary of Individual Factors
+
+<div style="float: left; width: 50%;">
+
+```{r factor summary, echo=FALSE,message=FALSE,warning=FALSE}
+
+sql_marvel <- "SELECT  name , CAST(APPEARANCES as int) as 'Total_Appearances', CAST(Year as int)/10*10 as 'Decade_1st_Appearance',round(cast(APPEARANCES as real)/(2021 - cast(year as real)),2) as 'Total_Appearances_per_year',ALIGN,EYE,HAIR,SEX,GSM,ALIVE,FIRST_APPEARANCE,Year, (2021 - cast(year as real)) as 'Age' FROM Marvel 
+WHERE CAST(APPEARANCES as int) > 0 and Year > 0 and LENGTH(ALIGN)>0 and LENGTH(SEX)>0 ORDER BY 1"
+res <- dbSendQuery(con, sql_marvel)
+df_marvel <- dbFetch(res)
+
+df_marvel$EYE <- gsub(x = df_marvel$EYE, pattern = "Eyeballs", replacement = "Eyes")
+df_marvel$GSM <- ifelse(df_marvel$GSM == "", "Unclassified", df_marvel$GSM)
+df_marvel$EYE <- ifelse(df_marvel$EYE == "", "Unclassified", df_marvel$EYE)
+df_marvel$HAIR <- ifelse(df_marvel$HAIR == "", "Unclassified", df_marvel$HAIR)
+
+SEX_distinct <- n_distinct(df_marvel$SEX)
+#paste("Number of Factors within Sex Variable: ",SEX_distinct)
+ALIGN_distinct <- n_distinct(df_marvel$ALIGN)
+#paste("Number of Factors within Alignment Variable: ",ALIGN_distinct)
+GSM_distinct <- n_distinct(df_marvel$GSM)
+#paste("Number of Factors within Gender/SEX Variable: ",GSM_distinct)
+ALIVE_distinct <- n_distinct(df_marvel$ALIVE)
+#paste("Number of Factors within Alive Variable: ",ALIVE_distinct)
+HAIR_distinct <- n_distinct(df_marvel$HAIR)
+#paste("Number of Factors within Hair Variable: ",HAIR_distinct)
+EYE_distinct <- n_distinct(df_marvel$EYE)
+#paste("Number of Factors within Eyes Variable: ",EYE_distinct)
+
+tab <- matrix(c(SEX_distinct, ALIGN_distinct, GSM_distinct, ALIVE_distinct, HAIR_distinct, EYE_distinct), ncol=1, byrow=TRUE)
+colnames(tab) <- c('Number of Distinct Characteristics')
+rownames(tab) <- c('Sex','Alignment','Gender/Sexuality','Alive/Deceased','Hair Color','Eye Color')
+distinctfactortable <- as.table(tab)
+knitr::kable(distinctfactortable)
+```
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="50%",fig.align = 'center'}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/magneto.png")
+```
+
+</div>
+
+## Summary of Individual Factors (Sex %)
+<div style="float: left; width: 50%;">
+
+```{r factor summary2, echo=FALSE,message=FALSE,warning=FALSE}
+
+Sex_percent <- round(prop.table(table(df_marvel$SEX))*100,2)
+Sex_df <- data.frame(Category=names(Sex_percent), Percent=as.numeric(Sex_percent))
+
+Align_percent <- round(prop.table(table(df_marvel$ALIGN))*100,2)
+Align_df <- data.frame(Category=names(Align_percent), Percent=as.numeric(Align_percent))
+
+EYE_percent <- round(prop.table(table(df_marvel$EYE))*100,2)
+EYE_df <- data.frame(Category=names(EYE_percent), Percent=as.numeric(EYE_percent))
+
+ALIVE_percent <- round(prop.table(table(df_marvel$ALIVE))*100,2)
+ALIVE_df <- data.frame(Category=names(ALIVE_percent), Percent=as.numeric(ALIVE_percent))
+
+GSM_percent <- round(prop.table(table(df_marvel$GSM))*100,2)
+GSM_df <- data.frame(Category=names(GSM_percent), Percent=as.numeric(GSM_percent))
+
+HAIR_percent <- round(prop.table(table(df_marvel$HAIR))*100,2)
+HAIR_df <- data.frame(Category=names(HAIR_percent), Percent=as.numeric(HAIR_percent))
+
+knitr::kable(Sex_df)
+```
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="50%",fig.align = 'center'}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/rogue.png")
+```
+
+</div>
+
+## Summary of Individual Factors (Good/Bad Alignment %)
+
+<div style="float: left; width: 50%;">
+
+```{r factor summary2a, echo=FALSE,message=FALSE,warning=FALSE}
+knitr::kable(Align_df)
+```
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="50%",fig.align = 'center'}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/thanos.png")
+```
+
+</div>
+
+## Summary of Individual Factors (Gender/Sexuality %) {.smaller}
+
+<div style="float: left; width: 50%;">
+
+```{r factor summary2b, echo=FALSE,message=FALSE,warning=FALSE}
+knitr::kable(GSM_df)
+```
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="50%",fig.align = 'center'}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/mystique.png")
+```
+
+</div>
+
+## Summary of Individual Factors 
+
+<div style="float: left; width: 50%;">
+
+Factors ranked by Completeness:
+
+1. SEX (100%)
+
+2. ALIGNMENT (100%) 
+
+3. ALIVE (100%)
+
+4. HAIR (80%)
+
+5. EYE (45%)
+
+6. Gender/Sexuality (<1%)
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="50%",fig.align = 'center'}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/oro_monroe_storm.png")
+```
+
+</div>
+
+## Summary Stats 
+
+```{r summary, echo=FALSE,message=FALSE,warning=FALSE}
+summary_stats<- df_marvel %>% 
+  summarize("Avg # of Appearances" = round(mean(Total_Appearances),2),
+            "Avg # of Appearances/Year" = round(mean(Total_Appearances_per_year),2),
+            "Standard Deviation" = round(sd(Total_Appearances),2),
+            "Number of Characters" = n(), 
+            "Max # of Appearances" = max(Total_Appearances),
+            "Min # of Appearances" = min(Total_Appearances))
+
+knitr::kable(
+  summary_stats
+)
+```
+
+## Summary of Individual Factors {.smaller}
+
+```{r factor summary3a, echo=FALSE,message=FALSE,warning=FALSE,pages.print=3}
+
+summary_stats<- df_marvel %>% 
+  group_by(SEX) %>% 
+  summarize("Avg # of Appearances" = round(mean(Total_Appearances),2),
+            "Avg # of Appearances/Year" = round(mean(Total_Appearances_per_year),2),
+            "Standard Deviation" = round(sd(Total_Appearances),2),
+            "Number of Characters" = n(), 
+            "Max # of Appearances" = max(Total_Appearances),
+            "Min # of Appearances" = min(Total_Appearances))
+
+knitr::kable(
+  summary_stats, 
+  caption = "Summary Stats by Sex"
+)
+             
+```
+
+## Summary of Individual Factors {.smaller}
+
+```{r factor summary3b, echo=FALSE,tidy=TRUE, tidy.opts=list(width.cutoff=60),message=FALSE,warning=FALSE}
+
+
+summary_stats<- df_marvel %>% 
+  group_by(ALIGN) %>% 
+  summarize("Avg # of Appearances" = round(mean(Total_Appearances),2),
+            "Avg # of Appearances/Year" = round(mean(Total_Appearances_per_year),2),
+            "Standard Deviation" = round(sd(Total_Appearances),2),
+            "Number of Characters" = n(), 
+            "Max # of Appearances" = max(Total_Appearances),
+            "Min # of Appearances" = min(Total_Appearances))
+
+knitr::kable(
+  summary_stats, 
+  caption = "Summary Stats by Good/Bad Alignment"
+)
+
+summary_stats<- df_marvel %>% 
+  group_by(ALIVE) %>% 
+  summarize("Avg # of Appearances" = round(mean(Total_Appearances),2),
+            "Avg # of Appearances/Year" = round(mean(Total_Appearances_per_year),2),
+            "Standard Deviation" = round(sd(Total_Appearances),2),
+            "Number of Characters" = n(), 
+            "Max # of Appearances" = max(Total_Appearances),
+            "Min # of Appearances" = min(Total_Appearances))
+
+summary_stats<- df_marvel %>% 
+  group_by(HAIR) %>% 
+  summarize("Avg # of Appearances" = round(mean(Total_Appearances),2),
+            "Avg # of Appearances/Year" = round(mean(Total_Appearances_per_year),2),
+            "Standard Deviation" = round(sd(Total_Appearances),2),
+            "Number of Characters" = n(), 
+            "Max # of Appearances" = max(Total_Appearances),
+            "Min # of Appearances" = min(Total_Appearances))
+
+summary_stats<- df_marvel %>% 
+  group_by(GSM) %>% 
+  summarize("Avg # of Appearances" = round(mean(Total_Appearances),2),
+            "Avg # of Appearances/Year" = round(mean(Total_Appearances_per_year),2),
+            "Standard Deviation" = round(sd(Total_Appearances),2),
+            "Number of Characters" = n(), 
+            "Max # of Appearances" = max(Total_Appearances),
+            "Min # of Appearances" = min(Total_Appearances))
+
+
+summary_stats<- df_marvel %>% 
+  group_by(EYE) %>% 
+  summarize("Avg # of Appearances" = round(mean(Total_Appearances),2),
+            "Avg # of Appearances/Year" = round(mean(Total_Appearances_per_year),2),
+            "Standard Deviation" = round(sd(Total_Appearances),2),
+            "Number of Characters" = n(), 
+            "Max # of Appearances" = max(Total_Appearances),
+            "Min # of Appearances" = min(Total_Appearances))
+             
+```
+
+## Appearance Distribution {.smaller}
+
+```{r appearance charts, echo=FALSE,message=FALSE,warning=FALSE}
+
+ggplot(df_marvel, aes(x = Total_Appearances)) +
+  geom_histogram(position = "identity", bins = 10) +
+  xlab("Total Appearances")+
+  ylab("Number of Characters")+  
+  ggtitle("Figure 1. Character Appearance Distribution")
+```
+
+## Appearance Distribution {.smaller}
+
+```{r appearance charts by year, echo=FALSE,message=FALSE,warning=FALSE}
+
+ggplot(df_marvel, aes(x = Total_Appearances_per_year)) +
+  geom_histogram(position = "identity") +
+  xlab("Appearances by Year")+
+  ylab("Number of Characters")+  
+  ggtitle("Figure 2. Character Appearance by Year Distribution")
+
+```
+
+## Appearance Distribution
+
+```{r boxplot charts1, echo=FALSE,message=FALSE,warning=FALSE}
+
+ggplot(df_marvel, aes(x=SEX, y = Total_Appearances_per_year))+
+  geom_boxplot() +
+  xlab("Character Sex")+
+  ylab("Number of Appearances")+  
+  labs(fill='Character Sex')+ 
+  ggtitle("Figure 3. Character Appearance Distribution by Sex")
+
+```
+
+
+## Appearance Distribution
+
+```{r hist charts, echo=FALSE,message=FALSE,warning=FALSE}
+
+df_marvel <- df_marvel %>%
+  mutate(appearance_bin = ifelse(Total_Appearances == 1, "1 Appearance",
+                                 ifelse(Total_Appearances >1 & Total_Appearances <10, "2 to 10 Appearances", ">10 Appearances")))
+
+appearance_distributions <- df_marvel %>%
+  group_by(appearance_bin) %>% 
+  summarize("Number_Appearances" = n())
+
+appearance_distributions$appearance_bin <- factor(appearance_distributions$appearance_bin ,levels = c("1 Appearance", "2 to 10 Appearances", ">10 Appearances"))
+
+ggplot(appearance_distributions, aes(x = appearance_bin, y = Number_Appearances)) +
+  geom_bar(stat = "identity") +
+  xlab("Appearnce Bin")+
+  ylab("Number of Appearances")+  
+  ggtitle("Figure 4. Number of Appearance Distribution")
+
+```
+
+## Appearance Distribution {.smaller}
+
+```{r log hist , echo=FALSE,message=FALSE,warning=FALSE}
+
+df_marvel_mod <- df_marvel %>%
+  mutate(apperances_log = log(Total_Appearances),
+         apperances_per_year_log = log(Total_Appearances_per_year))
+
+ggplot(df_marvel_mod, aes(x = apperances_log)) +
+  geom_histogram(position = "identity") +
+  xlab("Total Appearances (Log Scale)")+
+  ylab("Number of Characters")+  
+  labs(fill=' Sex')+ 
+  ggtitle("Figure 5. Number of Appearance Distribution (Log Scale)")
+
+```
+
+## Appearance Distribution by Factors (by Sex & Decade)
+
+```{r box plots charts, echo=FALSE,message=FALSE,warning=FALSE}
+df_marvel_mod$Decade_1st_Appearance <- as.factor(df_marvel_mod$Decade_1st_Appearance )
+
+appearences_overtime_chart <- ggplot(df_marvel_mod,aes(Decade_1st_Appearance,Total_Appearances ,fill=SEX)) +  geom_bar(stat="identity",position="dodge",aes(fill=SEX))+
+  xlab("Decade of 1st Appearance")+
+  ylab("Number of Appearances")+  
+  labs(fill='Character Sex')+  
+  ggtitle("Figure 6. Character Appearance over Time by Sex")
+
+appearences_overtime_chart
+
+```
+
+## Apperance Distribution by Factors (By Sex)
+
+```{r box plots charts3, echo=FALSE,message=FALSE,warning=FALSE}
+appearences_boxplot_sex_appearance_log <- ggplot(df_marvel_mod, aes(x=SEX, y = apperances_log))+
+  geom_boxplot() +
+  xlab("Character Sex")+
+  ylab("Number of Appearances (Log Scale)")+  
+  labs(fill='Character Sex')+ 
+  ggtitle("Figure 7. Character Appearance Distribution by Sex")
+appearences_boxplot_sex_appearance_log
+```
+
+## Apperance Distribution by Factors (By Align)
+
+```{r box plots charts4, echo=FALSE,message=FALSE,warning=FALSE}
+
+appearences_boxplot_align <- ggplot(df_marvel_mod, aes(x=ALIGN, y = apperances_log))+
+  geom_boxplot() +
+  xlab("Character Alignment")+
+  ylab("Number of Appearances (Log Scale)")+  
+  labs(fill='Character Alignment')+ 
+  ggtitle("Figure 10. Character Appearance Distribution by Align")
+
+appearences_boxplot_align
+
+```
+
+## What Factors influence Appearances?
+
+Bayesian Regression Analysis
+
+ - See distributions of each individual factor's R-squared
+
+Mixed Model 
+
+ - Determine which factors may interact with each other 
+ 
+ - Fix time variable 
+
+## Regression Analysis (R-Squared Analsis)
+
+```{r bayesian regression, echo=FALSE,message=FALSE,warning=FALSE,results = 'hide', out.width="30%"}
+
+vars <- c("ALIGN","EYE","HAIR","SEX","ALIVE","GSM")
+
+for(i in vars){
+  fmla <- as.formula(paste0("apperances_log ~",i))
+  test_reg <- stan_glm(fmla, data=df_marvel_mod, chains = 3, 
+                       iter = 1000, warmup = 500)
+  assign(paste0("bayes_reg_summary_",i),test_reg)
+  r2_posterior_test <- bayes_R2(test_reg)
+  assign(paste0("r2_posterior_",i),r2_posterior_test) 
+  hist_posterior_test <- hist(r2_posterior_test,
+                              main = paste("Histogram of ", i, " Factor"),
+                              xlab = "R2 Posterior Test",
+                              ylab = "Frequency")
+  assign(paste0("hist_posterior_",i),hist_posterior_test)
+}
+
+```
+
+## Regression Analysis (Factor Analsis) | (Alignment/Sex/Hair) {.smaller}
+
+```{r mixed model regression, echo=FALSE,message=FALSE,warning=FALSE}
+
+mod <- lmer(apperances_log ~ (ALIGN)*(SEX)*HAIR + (1|Decade_1st_Appearance) + (1|ALIVE)+ 0, data = df_marvel_mod)
+
+anova1 <- anova(mod)
+
+knitr::kable(
+  anova1, 
+  caption = "ANOVA Table for Align/Sex/Hair"
+)
+
+```
+ 
+## Regression Analysis (Factor Analsis) | (Alignment/Sex/Eye) {.smaller} {.smaller}
+
+```{r mixed model regression2, echo=FALSE,message=FALSE,warning=FALSE}
+mod2 <- lmer(apperances_log ~ ALIGN*SEX*EYE + (1|Decade_1st_Appearance) + (1|ALIVE)+ 0, data = df_marvel_mod)
+
+anova2 <- anova(mod2)
+
+knitr::kable(
+  anova2, 
+  caption = "ANOVA Table for Align/Sex/Eye"
+)
+```
+
+## Regression Analysis {.smaller}
+
+```{r mixed model regression3, echo=FALSE,message=FALSE,warning=FALSE}
+
+mod3 <- lmer(apperances_log ~ EYE*HAIR + (1|Decade_1st_Appearance) + (1|ALIVE)+ 0, data = df_marvel_mod)
+
+anova3 <- anova(mod3)
+
+knitr::kable(
+  anova3, 
+  caption = "ANOVA Table for Eye/Hair"
+)
+```
+
+## Predicting The Next Great Marvel Characters! (Boosting Method)
+
+<div style="float: left; width: 50%;">
+
+Gradient Boosting Model 
+  
+- Multiple factor variables make predition with traditional regression difficult
+
+- Fairly predictive 
+
+- Runs efficiently 
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="100%"}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/The-Tree-of-Life.jpg")
+```
+
+</div>
+
+```{r gradient boosting2 model, echo=FALSE,results = 'hide',message=FALSE,warning=FALSE}
+
+#xBoosting Model 
+
+#get number of rows to build test model 
+N <- nrow(df_marvel_mod)
+
+target <- round(0.75*N)
+
+gp <- runif(N)
+
+df_marvel_train <- df_marvel_mod[gp < 0.75,]
+df_marvel_test <- df_marvel_mod[gp >= 0.75,]
+
+vars <- c("ALIGN","EYE","HAIR","SEX","GSM","ALIVE")
+
+treatplan <- designTreatmentsZ(df_marvel_train, vars)
+
+(scoreFrame <- treatplan %>% 
+    use_series(scoreFrame) %>%
+    select(varName, origName, code))
+
+(newvars <- scoreFrame %>%
+    filter(code %in% c("lev")) %>%
+    use_series(varName))
+
+(df_marvel_train.treat <- prepare(treatplan, df_marvel_train, varRestriction = newvars))
+
+(df_marvel_test.treat <- prepare(treatplan, df_marvel_test, varRestriction = newvars))
+
+cv  <- xgb.cv(data = as.matrix(df_marvel_train.treat),
+              label = df_marvel_train$apperances_log,
+              nrounds = 100,
+              nfold = 5, 
+              objective = "reg:linear",
+              eta = 0.3, 
+              max_depth = 6, 
+              early_stopping_rounds = 10, 
+              verbose = 0
+)
+
+elog <- cv$evaluation_log
+
+elog %>%
+  summarize(ntrees.train = which.min(train_rmse_mean),
+            ntrees.test = which.min(test_rmse_mean))
+
+df_marvel_xgb  <- xgboost(data = as.matrix(df_marvel_train.treat),
+                          label = df_marvel_train$apperances_log,
+                          nrounds = 11,
+                          objective = "reg:linear",
+                          eta = 0.3, 
+                          max_depth = 6, 
+                          verbose = 0
+)
+
+df_marvel_test$pred <- predict(df_marvel_xgb, as.matrix(df_marvel_test.treat))
+
+pred_plot <- ggplot(df_marvel_test, aes(x = pred, y = apperances_log))+
+  geom_point()+
+  geom_abline()
+
+model_eval <- df_marvel_test %>%
+  mutate(residuals = apperances_log - pred,
+         appearance_pred = exp(pred)) %>%
+  summarize(rmse = sqrt(mean(residuals^2)),
+            sd = sd(Total_Appearances),
+            sd_pred = sd(appearance_pred))
+
+knitr::kable(
+  model_eval, 
+  caption = "Model Evaluation"
+)
+
+```
+
+
+## Top Predicted Characteristics {.smaller}
+
+```{r pred summary stats, echo=FALSE,message=FALSE,warning=FALSE}
+
+library(tidyr)
+library(tidyverse)
+
+summary_stats_pred <- df_marvel_test %>% 
+  group_by(SEX,ALIGN,EYE,HAIR,GSM) %>% 
+  summarize(pred_appearance_avg = round(mean(exp(pred)))) %>%
+  arrange(desc(pred_appearance_avg))  %>%
+  head()
+
+knitr::kable(
+  summary_stats_pred, 
+  caption = "Summary Stats for Predicted Appearances"
+)
+
+```
+
+## Top Predicted Characteristics (By Sex) {.smaller}
+
+```{r pred summary sex, echo=FALSE,message=FALSE,warning=FALSE}
+
+library(tidyr)
+library(tidyverse)
+
+summary_stats_pred_sex <- df_marvel_test %>% 
+  group_by(SEX) %>% 
+  summarize(pred_appearance_avg = round(mean(exp(pred))),
+            "# of Characters" = n()) %>%
+  arrange(desc(pred_appearance_avg))  %>%
+  head()
+
+colnames(summary_stats_pred_sex)[colnames(summary_stats_pred_sex) == "pred_appearance_avg" ] <-
+"Predicted # of Appearances"
+
+
+knitr::kable(
+  summary_stats_pred_sex, 
+  caption = "Summary Stats for Predicted Appearances (By Sex)"
+)
+
+```
+
+## Top Predicted Characteristics (By Alignment) {.smaller}
+
+```{r pred summary align, echo=FALSE,message=FALSE,warning=FALSE}
+
+library(tidyr)
+library(tidyverse)
+
+summary_stats_pred_align<- df_marvel_test %>% 
+  group_by(ALIGN) %>% 
+  summarize(pred_appearance_avg = round(mean(exp(pred))),
+            "# of Characters" = n()) %>%
+  arrange(desc(pred_appearance_avg))  %>%
+  head()
+
+colnames(summary_stats_pred_align)[colnames(summary_stats_pred_align) == "pred_appearance_avg"] <-
+"Predicted # of Appearances"
+
+
+knitr::kable(
+  summary_stats_pred_align, 
+  caption = "Summary Stats for Predicted Appearances (By Good/Bad 
+  Alignment)"
+)
+
+```
+
+## Top Predicted Characteristics (By Eye) {.smaller}
+
+```{r pred summary eye, echo=FALSE,message=FALSE,warning=FALSE}
+
+library(tidyr)
+library(tidyverse)
+
+summary_stats_pred_eye <- df_marvel_test %>% 
+  group_by(EYE) %>% 
+  summarize(pred_appearance_avg = round(mean(exp(pred))),
+            "# of Characters" = n()) %>%
+  arrange(desc(pred_appearance_avg))  %>%
+  head()
+
+colnames(summary_stats_pred_eye)[colnames(summary_stats_pred_eye) == "pred_appearance_avg"] <-
+"Predicted # of Appearances"
+
+knitr::kable(
+  summary_stats_pred_eye, 
+  caption = "Summary Stats for Predicted Appearances (By Eye)"
+)
+
+```
+
+## Top Predicted Characteristics (By Hair) {.smaller}
+
+```{r pred summary hair, echo=FALSE,message=FALSE,warning=FALSE}
+
+library(tidyr)
+library(tidyverse)
+
+summary_stats_pred_hair <- df_marvel_test %>% 
+  group_by(HAIR) %>% 
+  summarize(pred_appearance_avg = round(mean(exp(pred))),
+            "# of Characters" = n()) %>%
+  arrange(desc(pred_appearance_avg))  %>%
+  head()
+
+colnames(summary_stats_pred_hair)[colnames(summary_stats_pred_hair) == "pred_appearance_avg"] <-
+"Predicted # of Appearances"
+
+knitr::kable(
+  summary_stats_pred_hair, 
+  caption = "Summary Stats for Predicted Appearances (By Hair)"
+)
+
+```
+
+## Introducing (New Character 1) {.smaller}
+
+<div style="float: left; width: 50%;">
+
+Characteristics
+  
+- Female (7)
+
+- Good (8)
+
+- Hazel Eyes (27)*
+
+- Red Hair (9)
+
+Expected Appearances between 7 and 27 
+
+*High volatility
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="50%",fig.align = 'center'}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/char1.png")
+```
+</div>
+
+## Introducing (New Character 2) {.smaller}
+
+<div style="float: left; width: 50%;">
+
+Gradient Boosting Model 
+  
+- Female (7) 
+
+- Neutral (5)
+
+- Blue Eyes (12)
+
+- Strawberry Blonde Hair (29)
+
+*Medium volatility
+
+Expected Appearances between 5 and 29
+
+
+</div>
+<div style="float: right; width: 50%;">
+
+```{r, echo=FALSE, out.width="50%"}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/char2.png")
+```
+
+</div>
+
+## Post Credits (Bonus Character)
+
+```{r, echo=FALSE, out.width="100%"}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/cerebro.png")
+```
+
+
+## Post Credits (Bonus Character)
+
+<div style="float: left; width: 50%;">
+
+What if we have a few more data points? 
+  
+- Demographics of readers
+
+- Deeper character dynamics 
+
+  - Personality traits 
+
+- Character Powers  
+
+- Interaction between storylines (Good vs Bad)
+
+</div>
+<div style="float: right; width: 50%;">
+
+
+```{r, echo=FALSE, out.width="50%"}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/lab_x.png")
+```
+
+</div>
+
+## Post Credits (Bonus Character) | Marvel Character X {.smaller}
+
+```{r, echo=FALSE, out.width="50%"}
+knitr::include_graphics("~/Data_Science_Projects/R/CaseStudy/CaseStudyFinal/images/deadpool.png")
+```
+
+
+## Questions?  
